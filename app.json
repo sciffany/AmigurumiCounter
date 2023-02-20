@@ -2,7 +2,7 @@
   "expo": {
     "name": "AmigurumiCounter",
     "slug": "AmigurumiCounter",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -24,10 +24,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.sciffany.AmigurumiCounter"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "183abd4e-b3b3-4233-bcb8-d17ec5039dc7"
+      }
     }
   }
 }
