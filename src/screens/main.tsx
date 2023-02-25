@@ -27,10 +27,12 @@ type StitchRow = Stitch[];
 export function Main() {
   const [pattern, setPattern] = useState(Array(0).fill(Math.random()));
   const [projectNames, setProjectNames] = useState<string[]>([]);
-
   const [projectName, setProjectName] = useState("");
+  const [selectedProjectName, setSelectedProjectName] = useState("");
   const [saveModalShown, setSaveModalShown] = useState(false);
   const [loadModalShown, setLoadModalShown] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [startRow, setStartRow] = useState(1);
 
   useEffect(()=>{
     AsyncStorage.getItem(`@amigurumi/filenames`).then((projectNames)=>{
@@ -76,9 +78,13 @@ export function Main() {
   }
 
   async function save() {
-    console.log(projectName);
-    await AsyncStorage.setItem(`@amigurumi/filenames`, JSON.stringify([...projectNames, projectName]) );
+    await AsyncStorage.setItem(`@amigurumi/filenames`, JSON.stringify(
+      Array.from(new Set([...projectNames, projectName])))
+    );
+
     await AsyncStorage.setItem(`@amigurumi/${projectName}/size`, `${pattern.length}`);
+    await AsyncStorage.setItem(`@amigurumi/${projectName}/startRow`, `${startRow}`);
+
     await Promise.all(Array(pattern.length).fill(0).map(async (row, rowIndex) => {
       const rowToSave = await AsyncStorage.getItem(`@amigurumi/${rowIndex}`)
       await AsyncStorage.setItem(`@amigurumi/${projectName}/${rowIndex}`, rowToSave ?? "");
@@ -88,19 +94,23 @@ export function Main() {
 
   async function load(projectName: string) {
     const loadedPatternLength = parseInt(await AsyncStorage.getItem(`@amigurumi/${projectName}/size`) ?? "0");
+    const loadedStartRow = parseInt(await AsyncStorage.getItem(`@amigurumi/${projectName}/startRow`) ?? "1");
+
     await Promise.all(Array(loadedPatternLength).fill(0).map(async (row, rowIndex) => {
       const loadedRow = await AsyncStorage.getItem(`@amigurumi/${projectName}/${rowIndex}`)
       await AsyncStorage.setItem(`@amigurumi/${rowIndex}`, loadedRow ?? "");
     }))
+    
     setPattern(Array(loadedPatternLength).fill(0).map(_=>Math.random()));
     setLoadModalShown(false);
+    setStartRow(loadedStartRow);
   }
 
   return (
     <>
       {saveModalShown &&
         <Modal className="flex flex-col h-full justify-center">
-          <Text>Project Name</Text>
+          <Text>Input Project Name Below:</Text>
           <TextInput onChangeText={setProjectName}></TextInput>
           <Button onPress={save} title="Save"></Button>
           <Button color="gray" onPress={()=>setSaveModalShown(false) } title="Cancel"></Button>
@@ -110,19 +120,44 @@ export function Main() {
         <Modal className="flex flex-row">
           <Text>Load Project</Text>
           {projectNames.map((projectName, index) => {
-            return <Button key={Math.random()} onPress={()=>load(projectName)} title={projectName}></Button>
+            return <View className="flex flex-row">
+              <TouchableOpacity className="flex-1 flex flex-row items-center bg-blue-500" key={Math.random()} onPress={()=>load(projectName)}>
+                <Text className="text-white">{projectName}</Text>
+              </TouchableOpacity>
+              <Button onPress={
+                async ()=>{
+                  setSelectedProjectName(projectName);
+                  setDeleteModal(true);
+                }}
+              color="red" title="Delete"></Button>
+            </View>
           })}
-          <Button color="gray" onPress={()=>setLoadModalShown(false) } title="Cancel"></Button>
+          <Button color="gray" onPress={()=>{setLoadModalShown(false)} } title="Cancel"></Button>
         </Modal>
+      }
+      {deleteModal && <Modal className="flex flex-row">
+        <Text>Are you sure you want to delete {selectedProjectName} project?</Text>
+        <Button color="red" onPress={()=>{
+          setDeleteModal(false)
+          setProjectNames(projectNames.filter((projectName)=>projectName !== selectedProjectName));
+          AsyncStorage.setItem(`@amigurumi/filenames`, JSON.stringify(projectNames.filter((projectName)=>projectName !== selectedProjectName)));
+        } } title="Delete"></Button>
+        <Button color="gray" onPress={()=>{setDeleteModal(false)} } title="Cancel"></Button>
+      </Modal>
       }
       <View className='p-6 pt-12'>
         <View className="flex flex-row items-center justify-center">
           <Text className="text-lg">Amigurumi Counter App</Text>
         </View>
+        <Text>Starting Row: </Text><TextInput className="border-2 p-2 w-24"
+          onChangeText={(value)=>setStartRow(parseInt(value))
+        }
+        >
+        </TextInput>
         <ScrollView>
           {
             pattern.map((randomNumber, rowIndex) => {
-              return <StitchRow key={randomNumber} rowIndex={rowIndex}/>
+              return <StitchRow rowName={(startRow+rowIndex).toString()} key={randomNumber} rowIndex={rowIndex}/>
             })
           }
         </ScrollView>
@@ -136,7 +171,16 @@ export function Main() {
           <TouchableOpacity onPress={()=>setSaveModalShown(true)} className="bg-green-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
             <Text  className="text-white">Save</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={()=>setLoadModalShown(true)} className="bg-gray-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+          <TouchableOpacity onPress={
+            async ()=>{
+              setLoadModalShown(true)
+              await AsyncStorage.getItem(`@amigurumi/filenames`).then((projectNames)=>{
+                if (projectNames) {
+                  console.log(projectNames);
+                  setProjectNames(JSON.parse(projectNames));
+                }
+            })}
+          } className="bg-gray-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
             <Text  className="text-white">Load</Text>
           </TouchableOpacity>
         </View>
@@ -146,7 +190,7 @@ export function Main() {
   
 };
 
-function StitchRow({rowIndex}: {rowIndex: number}) {
+function StitchRow({rowIndex, rowName}: {rowIndex: number, rowName: string}) {
   const [stitchRow, setStitchRow] = useState<Stitch[]>([]);
   const getStitchRowFromStorage = async () => {
     try {
@@ -187,7 +231,6 @@ function StitchRow({rowIndex}: {rowIndex: number}) {
       const jsonValue = JSON.stringify(stitchRow)
       await AsyncStorage.setItem(`@amigurumi/${rowIndex}`, jsonValue)
     } catch (e) {
-      // saving error
     }
   }
 
@@ -224,7 +267,7 @@ function StitchRow({rowIndex}: {rowIndex: number}) {
     await storeData(updateStitchType(stitchRow));
   }
 
-  return <View className="flex flex-row justify-between items-center w-full border-b-2 border-gray-300 py-2">
+  return <><Text>Row: {rowName}</Text><View className="flex flex-row justify-between items-center w-full border-b-2 border-gray-300 py-2">
           <View className="flex flex-row flex-wrap justify-start flex-1">
             {stitchRow.map((stitch, stitchIndex)=>{
               return <StitchComponent key={Math.random()} stitchIndex={stitchIndex} stitch={stitch} changeStitchType={changeStitchType}/>;
@@ -236,6 +279,7 @@ function StitchRow({rowIndex}: {rowIndex: number}) {
           </View>
           <Text className="w-1/6 text-3xl">{getEffectiveLength(stitchRow)}</Text>
         </View>
+        </>
 }
 
 function StitchComponent({changeStitchType, stitchIndex, stitch}: {changeStitchType:(stitchIndex: number) => void, stitchIndex: number, stitch: Stitch}) {

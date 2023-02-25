@@ -2,7 +2,7 @@
   "expo": {
     "name": "AmigurumiCounter",
     "slug": "AmigurumiCounter",
-    "version": "5.0.0",
+    "version": "6.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-chrome-192x192.png",
         "backgroundColor": "#FFFFFF"
