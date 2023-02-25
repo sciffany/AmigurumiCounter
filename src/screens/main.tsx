@@ -35,6 +35,12 @@ export function Main() {
     });
     setStitches(newPattern);
   }
+  47
+  function removeStitch(rowNumber: number) {
+    const newPattern = [...pattern];
+    newPattern[rowNumber].pop();
+    setStitches(newPattern);
+  }
 
   function addRow() {
     const newPattern = [...pattern];
@@ -45,9 +51,38 @@ export function Main() {
   }
 
   function deleteRow() {
-    const newPattern = [...pattern];
-    newPattern.pop();
-    setStitches(newPattern);
+    if (pattern.length > 1) {
+      const newPattern = [...pattern];
+      newPattern.pop();
+      setStitches(newPattern);
+    }
+  }
+
+  function changeStitchType(rowNumber: number, stitchIndex: number) {
+    setStitches((pattern: StitchRow[]) => {
+      const newPattern = [...pattern];
+      const newStitch = {...newPattern[rowNumber][stitchIndex]};
+      newStitch.stitchNumber += 1;
+      if (newStitch.stitchNumber === 4) {
+        newStitch.stitchNumber = 0;
+      }
+      newPattern[rowNumber][stitchIndex] = newStitch;
+
+      if (newPattern[rowNumber][stitchIndex+1]) {
+        if (newStitch.stitchNumber === StitchNumber._2tog) {
+          newPattern[rowNumber][stitchIndex+1] = {
+            stitchType: newStitch.stitchType,
+            stitchNumber: StitchNumber._2tog,
+          };
+        } else if (newPattern[rowNumber][stitchIndex+1].stitchNumber === StitchNumber._2tog){
+          newPattern[rowNumber][stitchIndex+1] = {
+            stitchType: newStitch.stitchType,
+            stitchNumber: StitchNumber.nothing,
+          };
+        }
+      }
+      return newPattern;
+    });
   }
 
   return (
@@ -58,18 +93,21 @@ export function Main() {
           {rowNumber === 0 ?
             <View className="flex flex-row justify-between items-center w-full border-y-2 border-gray-300 py-2">
               <View className="flex flex-row flex-wrap justify-start flex-1">
-                {row.map((stitch) => {
-                  return <BaseStitch key={Math.random()}/>;
+                {row.map((stitch, stitchIndex) => {
+                  return <StitchComponent key={Math.random()} rowNumber={rowNumber} stitch={stitch} stitchIndex={stitchIndex} setStitches={setStitches}/>;
                 })}
               </View>
-              <AddStitchButton addStitch={addStitch} rowNumber={rowNumber}/>
-              <Text className="text-3xl">{row.length}</Text>
+              <View className="flex flex-col">
+                <AddStitchButton addStitch={addStitch} rowNumber={rowNumber} text="+"/>
+                <AddStitchButton addStitch={removeStitch} rowNumber={rowNumber} text="-"/>
+              </View>
+              <Text className="w-1/6 text-3xl">{getEffectiveLength(row)}</Text>
             </View>
             :
             <View key={Math.random()} className="flex flex-row justify-between items-center w-full border-y-2 border-gray-300 py-2">
               <View className="flex flex-row flex-wrap w-4/5">
                 {row.map((stitch, stitchIndex) => {
-                  return <StitchComponent key={Math.random()} rowNumber={rowNumber} stitch={stitch} stitchIndex={stitchIndex} setStitches={setStitches}/>;
+                  return <StitchComponent key={Math.random()} rowNumber={rowNumber} stitch={stitch} stitchIndex={stitchIndex} changeStitchType={changeStitchType}/>;
                 })}
               </View>
               <Text className="w-1/6 text-3xl">{getEffectiveLength(row)}</Text>
@@ -90,20 +128,7 @@ export function Main() {
   );
 };
 
-function StitchComponent({stitch, stitchIndex, rowNumber, setStitches}: {stitch: Stitch, stitchIndex: number, rowNumber: number, setStitches: Function}) {
-
-  function changeStitchType(rowNumber: number, stitchIndex: number) {
-    setStitches((pattern: StitchRow[]) => {
-      const newPattern = [...pattern];
-      const newStitch = {...newPattern[rowNumber][stitchIndex]};
-      newStitch.stitchNumber += 1;
-      if (newStitch.stitchNumber === 4) {
-        newStitch.stitchNumber = 0;
-      }
-      newPattern[rowNumber][stitchIndex] = newStitch;
-      return newPattern;
-    });
-  }
+function StitchComponent({stitch, stitchIndex, rowNumber, changeStitchType}: {stitch: Stitch, stitchIndex: number, rowNumber: number, changeStitchType: Function}) {
 
   return <TouchableOpacity onPress={()=>{changeStitchType(rowNumber, stitchIndex)}} className="flex flex-row">
     <View className={`h-8 w-8 ${getColourForStitchNumber(stitch.stitchNumber)} rounded-full flex flex-row justify-center items-center`}>
@@ -112,18 +137,15 @@ function StitchComponent({stitch, stitchIndex, rowNumber, setStitches}: {stitch:
   </TouchableOpacity>
 }
 
-function BaseStitch() {
-  return <View className="flex flex-row">
-    <View className="h-8 w-8 bg-gray-400 rounded-full flex flex-row justify-center items-center bg-blue-500"><Text className="text-white">1sc</Text></View>
-  </View>
-}
-
-function AddStitchButton({addStitch, rowNumber}: {
+function AddStitchButton({addStitch, rowNumber, text}: {
   addStitch: (rowNumber: number) => void;
   rowNumber: number;
+  text: string;
 }) {
   return <TouchableOpacity onPress={()=>addStitch(rowNumber)} className="flex flex-row">
-    <View className="h-8 w-8 bg-gray-400 rounded-full flex flex-row justify-center items-center"><Text className="text-white">+</Text></View>
+    <View className="h-8 w-8 bg-gray-400 rounded-full flex flex-row justify-center items-center">
+      <Text className="text-white">{text}</Text>
+    </View>
   </TouchableOpacity>
 }
 
@@ -155,7 +177,7 @@ function getEffectiveLength(stitchRow: StitchRow) {
       effectiveLength += 2;
     }
     if (stitchRow[i].stitchNumber === StitchNumber._2tog) {
-      effectiveLength += 1;
+      effectiveLength += 0.5;
     }
   }
   return effectiveLength;
