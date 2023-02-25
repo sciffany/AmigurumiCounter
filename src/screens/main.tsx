@@ -1,5 +1,5 @@
-import { memo, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, Button } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 enum StitchNumber {
@@ -26,6 +26,19 @@ type StitchRow = Stitch[];
 
 export function Main() {
   const [pattern, setPattern] = useState(Array(0).fill(Math.random()));
+  const [projectNames, setProjectNames] = useState<string[]>([]);
+
+  const [projectName, setProjectName] = useState("");
+  const [saveModalShown, setSaveModalShown] = useState(false);
+  const [loadModalShown, setLoadModalShown] = useState(false);
+
+  useEffect(()=>{
+    AsyncStorage.getItem(`@amigurumi/filenames`).then((projectNames)=>{
+      if (projectNames) {
+        setProjectNames(JSON.parse(projectNames));
+      }
+    })
+  }, []);
 
   async function addRow() {
     const previousRow = await AsyncStorage.getItem(`@amigurumi/${pattern.length-1}`);
@@ -63,49 +76,72 @@ export function Main() {
   }
 
   async function save() {
-    await AsyncStorage.setItem(`@amigurumi/file1/size`, `${pattern.length}`);
+    console.log(projectName);
+    await AsyncStorage.setItem(`@amigurumi/filenames`, JSON.stringify([...projectNames, projectName]) );
+    await AsyncStorage.setItem(`@amigurumi/${projectName}/size`, `${pattern.length}`);
     await Promise.all(Array(pattern.length).fill(0).map(async (row, rowIndex) => {
       const rowToSave = await AsyncStorage.getItem(`@amigurumi/${rowIndex}`)
-      await AsyncStorage.setItem(`@amigurumi/file1/${rowIndex}`, rowToSave ?? "");
+      await AsyncStorage.setItem(`@amigurumi/${projectName}/${rowIndex}`, rowToSave ?? "");
     }))
+    setSaveModalShown(false);
   }
 
-  async function load() {
-    const loadedPatternLength = parseInt(await AsyncStorage.getItem(`@amigurumi/file1/size`) ?? "0");
+  async function load(projectName: string) {
+    const loadedPatternLength = parseInt(await AsyncStorage.getItem(`@amigurumi/${projectName}/size`) ?? "0");
     await Promise.all(Array(loadedPatternLength).fill(0).map(async (row, rowIndex) => {
-      const loadedRow = await AsyncStorage.getItem(`@amigurumi/file1/${rowIndex}`)
+      const loadedRow = await AsyncStorage.getItem(`@amigurumi/${projectName}/${rowIndex}`)
       await AsyncStorage.setItem(`@amigurumi/${rowIndex}`, loadedRow ?? "");
     }))
     setPattern(Array(loadedPatternLength).fill(0).map(_=>Math.random()));
+    setLoadModalShown(false);
   }
 
   return (
-    <View className='p-6 pt-12'>
-      <View className="flex flex-row items-center justify-center">
-        <Text className="text-lg">Amigurumi Counter App</Text>
+    <>
+      {saveModalShown &&
+        <Modal className="flex flex-col h-full justify-center">
+          <Text>Project Name</Text>
+          <TextInput onChangeText={setProjectName}></TextInput>
+          <Button onPress={save} title="Save"></Button>
+          <Button color="gray" onPress={()=>setSaveModalShown(false) } title="Cancel"></Button>
+        </Modal>
+      }
+      {loadModalShown &&
+        <Modal className="flex flex-row">
+          <Text>Load Project</Text>
+          {projectNames.map((projectName, index) => {
+            return <Button key={Math.random()} onPress={()=>load(projectName)} title={projectName}></Button>
+          })}
+          <Button color="gray" onPress={()=>setLoadModalShown(false) } title="Cancel"></Button>
+        </Modal>
+      }
+      <View className='p-6 pt-12'>
+        <View className="flex flex-row items-center justify-center">
+          <Text className="text-lg">Amigurumi Counter App</Text>
+        </View>
+        <ScrollView>
+          {
+            pattern.map((randomNumber, rowIndex) => {
+              return <StitchRow key={randomNumber} rowIndex={rowIndex}/>
+            })
+          }
+        </ScrollView>
+        <View className="flex flex-row justify-center">
+          <TouchableOpacity onPress={addRow} className="bg-blue-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">  
+            <Text  className="text-white">+ Add Row</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={removeRow} className="bg-red-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+            <Text  className="text-white">- Delete Row</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={()=>setSaveModalShown(true)} className="bg-green-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+            <Text  className="text-white">Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={()=>setLoadModalShown(true)} className="bg-gray-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+            <Text  className="text-white">Load</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <ScrollView>
-        {
-          pattern.map((randomNumber, rowIndex) => {
-            return <StitchRow key={randomNumber} rowIndex={rowIndex}/>
-          })
-        }
-      </ScrollView>
-      <View className="flex flex-row justify-center">
-        <TouchableOpacity  className="bg-blue-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">  
-          <Text onPress={addRow} className="text-white">+ Add Row</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-red-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
-          <Text onPress={removeRow} className="text-white">- Delete Row</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-green-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
-          <Text onPress={save} className="text-white">Save</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-gray-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
-          <Text onPress={load} className="text-white">Load</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </>
   );
   
 };
