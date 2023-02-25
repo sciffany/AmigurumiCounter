@@ -25,7 +25,7 @@ type Stitch = {
 type StitchRow = Stitch[];
 
 export function Main() {
-  const [pattern, setPattern] = useState<number[]>([]);
+  const [pattern, setPattern] = useState(Array(0).fill(Math.random()));
 
   async function addRow() {
     const previousRow = await AsyncStorage.getItem(`@amigurumi/${pattern.length-1}`);
@@ -33,42 +33,61 @@ export function Main() {
     if (previousRow) {
       const prevRowJson = JSON.parse(previousRow) as Stitch[];
       const effectiveLength = getEffectiveLength(prevRowJson);
-      setPattern(pattern => [...pattern, effectiveLength]);
 
-      await AsyncStorage.setItem(
-        `@amigurumi/${pattern.length}`,
-        JSON.stringify(Array(effectiveLength).fill(
-          [
-            {
-              stitchType: StitchType.single,
-              stitchNumber: StitchNumber.nothing,
-            }
-          ]
-        ))
-      );
+      const previouslySavedRow = await AsyncStorage.getItem(`@amigurumi/${pattern.length}`);
+      const previouslySavedRowJson = null ? JSON.parse(previouslySavedRow ?? "[]") as Stitch[]: [];
 
-    } else {
-      setPattern(pattern => [...pattern, 0]);
+      if (previouslySavedRowJson.length === 0) {
+        await AsyncStorage.setItem(
+          `@amigurumi/${pattern.length}`,
+          JSON.stringify(Array(effectiveLength).fill(
+            [
+              {
+                stitchType: StitchType.single,
+                stitchNumber: StitchNumber.nothing,
+              }
+            ]
+          ))
+        );
+      }
     }
+    setPattern([...pattern, Math.random()]);
   }
 
   async function removeRow() {
-    setPattern(pattern => pattern.slice(0, pattern.length-1));
+    setPattern(pattern.slice(0, pattern.length-1));
     try {
       await AsyncStorage.removeItem(`@amigurumi/${pattern.length-1}`)
     } catch (e) {
     }
   }
 
+  async function save() {
+    await AsyncStorage.setItem(`@amigurumi/file1/size`, `${pattern.length}`);
+    await Promise.all(Array(pattern.length).fill(0).map(async (row, rowIndex) => {
+      const rowToSave = await AsyncStorage.getItem(`@amigurumi/${rowIndex}`)
+      await AsyncStorage.setItem(`@amigurumi/file1/${rowIndex}`, rowToSave ?? "");
+    }))
+  }
+
+  async function load() {
+    const loadedPatternLength = parseInt(await AsyncStorage.getItem(`@amigurumi/file1/size`) ?? "0");
+    await Promise.all(Array(loadedPatternLength).fill(0).map(async (row, rowIndex) => {
+      const loadedRow = await AsyncStorage.getItem(`@amigurumi/file1/${rowIndex}`)
+      await AsyncStorage.setItem(`@amigurumi/${rowIndex}`, loadedRow ?? "");
+    }))
+    setPattern(Array(loadedPatternLength).fill(0).map(_=>Math.random()));
+  }
+
   return (
-    <View className='px-6 py-12'>
+    <View className='p-6 pt-12'>
       <View className="flex flex-row items-center justify-center">
         <Text className="text-lg">Amigurumi Counter App</Text>
       </View>
       <ScrollView>
         {
-          pattern.map((rowCount, rowIndex) => {
-            return <StitchRow key={Math.random()} rowIndex={rowIndex}/>
+          pattern.map((randomNumber, rowIndex) => {
+            return <StitchRow key={randomNumber} rowIndex={rowIndex}/>
           })
         }
       </ScrollView>
@@ -78,6 +97,12 @@ export function Main() {
         </TouchableOpacity>
         <TouchableOpacity className="bg-red-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
           <Text onPress={removeRow} className="text-white">- Delete Row</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="bg-green-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+          <Text onPress={save} className="text-white">Save</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="bg-gray-500 rounded-full flex w-24 h-12 flex-row justify-center items-center">
+          <Text onPress={load} className="text-white">Load</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -102,7 +127,7 @@ function StitchRow({rowIndex}: {rowIndex: number}) {
         setStitchRow(stitchRow);
       }
     });
-  },[rowIndex])
+  }, [rowIndex])
 
   async function addStitch() {
     setStitchRow(stitchRow=>
